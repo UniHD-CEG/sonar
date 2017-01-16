@@ -56,6 +56,7 @@ public:
 private:
 	enum MsgType {P2P, COLL};
 	std::map<uint32_t, std::map<MsgType, std::map<uint64_t, uint64_t>>> messages_cdf {};
+	std::map<MsgType, std::map<uint64_t, uint64_t>> messages_cdf_allnodes {};
 public:
 	void addMessageCDF_P2P(uint32_t proc, uint64_t msg_len);
 	void addMessageCDF_COLL(uint32_t proc, uint64_t msg_len);

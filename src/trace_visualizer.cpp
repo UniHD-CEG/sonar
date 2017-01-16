@@ -50,11 +50,13 @@ void TraceVisualizer::addColl(uint32_t proc, uint64_t time, uint64_t sent, uint6
 void TraceVisualizer::addMessageCDF_P2P(uint32_t proc, uint64_t msg_len)
 {
 	messages_cdf[proc][P2P][msg_len]++;
+	messages_cdf_allnodes[P2P][msg_len]++;
 }
 
 void TraceVisualizer::addMessageCDF_COLL(uint32_t proc, uint64_t msg_len)
 {
 	messages_cdf[proc][COLL][msg_len]++;
+	messages_cdf_allnodes[COLL][msg_len]++;
 }
 
 void TraceVisualizer::makeInjPlot(std::string dirname)
@@ -221,6 +223,41 @@ void TraceVisualizer::makeCdfPlot(std::string dirname)
 		out.close();
 		filename.str(std::string()); // clear stringstream
 	}
+
+	// all nodes (summary)
+	std::stringstream filename;
+	filename << dirname << "/" << "cdf-pAll.csv";
+	std::ofstream out(filename.str(), std::ofstream::out);
+
+	for (auto y:messages_cdf_allnodes)
+	{
+		// section header
+		auto type = y.first;
+		out << "\"" << msg_type[type] << "\"" << '\n';
+		out << "# trace=" << config->tracename << ", node=" << "All" << '\n';
+		out << "# size" << sep << "occurences" << sep << "percentage" << "\n";
+
+		// CDF-ify data
+		uint64_t total = 0;
+		for (auto l:y.second)
+			total += l.second;
+
+		double last = 0.0;
+		for (auto l:y.second)
+		{
+			auto size = l.first;
+			auto occu = l.second;
+			auto perc = static_cast<double>(occu) / static_cast<double>(total) + last;
+			last = perc;
+			out << size << sep << occu << sep << perc << "\n";
+		}
+
+		// next data section
+		out << "\n\n";
+	}
+
+	out.close();
+	filename.str(std::string()); // clear stringstream
 
 	std::string gnuplot_scriptfile = "plot_cdf.gnuplot";
 	if (config->verbose)
