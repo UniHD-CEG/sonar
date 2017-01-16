@@ -9,6 +9,7 @@ To build SONAR, you'll need the following tools and libraries:
 * zlib1g zlib1g-dev
 * gnuplot
 * OpenMPI >= 1.6.5 (optional, for trace generation)
+* VampirTrace >= 5.14.4 (optional, for trace generation)
 
 For Debian/Ubuntu based systems:
 ```
@@ -39,7 +40,7 @@ This will run the analysis of the example trace. SONAR will create a new directo
 The directory will be named according to the trace. Furthermore, the current time will be appended which prevents the overwriting of results due to multiple runs.
 
 # Custom trace generation
-You can create traces of your own application using [VampirTrace](https://tu-dresden.de/zih/forschung/projekte/vampir).
+You can create traces of your own application using [VampirTrace](https://tu-dresden.de/zih/forschung/projekte/vampirtrace).
 Quick start:
 ```
 vmpirun [MPI-OPTIONS] ./mpi-application [APP-OPTIONS]
@@ -47,7 +48,7 @@ vmpirun [MPI-OPTIONS] ./mpi-application [APP-OPTIONS]
 For more information, please refer to the VampirTrace documentation.
 
 # License
-Copyright (c) 2016, Computer Engineering Group at Ruprecht-Karls University of Heidelberg, Germany. All rights reserved. Copyright (c) 2016, School of Computer Science at Georgia Institute of Technology, USA. All rights reserved.
+Copyright (c) 2016, Computer Engineering Group at Ruprecht-Karls University of Heidelberg, Germany. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 
