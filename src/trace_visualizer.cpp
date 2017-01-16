@@ -168,12 +168,14 @@ void TraceVisualizer::makeInjPlot(std::string dirname)
 
 void TraceVisualizer::makeCdfPlot(std::string dirname)
 {
-	std::map<MsgType, std::string> type;
-	type[P2P] = "P2P";
-	type[COLL] = "Collectives";
+	std::map<MsgType, std::string> msg_type;
+	msg_type[P2P]  = "P2P";
+	msg_type[COLL] = "Collectives";
 
 	const auto& sep = gnuplot_seperator;
 
+	// per node
+	std::map<uint64_t, uint64_t> all {};
 	for (auto x:messages_cdf)
 	{
 		auto proc = x.first;
@@ -181,7 +183,8 @@ void TraceVisualizer::makeCdfPlot(std::string dirname)
 		filename << dirname << "/" << gnuplot_cdf_filename_prefix << std::setw(procEnumFill) << std::setfill('0') << proc << ".csv";
 		std::ofstream out(filename.str(), std::ofstream::out);
 
-		// set dummy values for gnuplot script
+		// set dummy values for gnuplot script in case of
+		// the absence of the respective message type
 		if (x.second[COLL].empty())
 			x.second[COLL][1] = 1;
 
@@ -191,22 +194,22 @@ void TraceVisualizer::makeCdfPlot(std::string dirname)
 		for (auto y:x.second)
 		{
 			// section header
-			auto dir = y.first;
-			out << "\"" << type[dir] << "\"" << '\n';
+			auto type = y.first;
+			out << "\"" << msg_type[type] << "\"" << '\n';
 			out << "# trace=" << config->tracename << ", node=" << proc << '\n';
 			out << "# size" << sep << "occurences" << sep << "percentage" << "\n";
 
-			// data
-			uint64_t occu_sum = 0;
+			// CDF-ify data
+			uint64_t total = 0;
 			for (auto l:y.second)
-				occu_sum += l.second;
+				total += l.second;
 
 			double last = 0.0;
 			for (auto l:y.second)
 			{
 				auto size = l.first;
 				auto occu = l.second;
-				auto perc = static_cast<double>(occu) / static_cast<double>(occu_sum) + last;
+				auto perc = static_cast<double>(occu) / static_cast<double>(total) + last;
 				last = perc;
 				out << size << sep << occu << sep << perc << "\n";
 			}
