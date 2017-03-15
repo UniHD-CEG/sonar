@@ -5,10 +5,16 @@ TraceVisualizer::TraceVisualizer(std::shared_ptr<Config> cfg, std::shared_ptr<Tr
 	stats(ts)
 {
 	// check for gnuplot utility
-	if (std::system("gnuplot --version > /dev/null"))
+	if (std::system("which gnuplot > /dev/null"))
 		std::cout << "Warning: gnuplot not found, no graphs will be printed!" << std::endl;
 	else
 		gnuplot_present = true;
+
+	// check for Rscript utility
+	if (std::system("which Rscript > /dev/null"))
+		std::cout << "Warning: Rscript not found, no graphs will be printed!" << std::endl;
+	else
+		rscript_present = true;
 
 #ifdef DEBUG
 	ctor_msg(__PRETTY_FUNCTION__);
@@ -19,6 +25,7 @@ TraceVisualizer::~TraceVisualizer()
 {
 	makeInjPlot(config->resdir);
 	makeCdfPlot(config->resdir);
+	makeInactivityHistogram(config->resdir);
 
 #ifdef DEBUG
 	dtor_msg(__PRETTY_FUNCTION__);
@@ -30,6 +37,8 @@ void TraceVisualizer::addSendP2P(uint32_t proc, uint64_t time, uint64_t bytes)
 	auto time_abs = stats->getAbsoluteTime(time);
 	auto time_rel = stats->getRelativeTime(time);
 	injections[proc][P2P_SEND].push_back({time_abs, time_rel, bytes});
+
+	updateInactPeriods(proc, time);
 }
 
 void TraceVisualizer::addRecvP2P(uint32_t proc, uint64_t time, uint64_t bytes)
@@ -37,6 +46,8 @@ void TraceVisualizer::addRecvP2P(uint32_t proc, uint64_t time, uint64_t bytes)
 	auto time_abs = stats->getAbsoluteTime(time);
 	auto time_rel = stats->getRelativeTime(time);
 	injections[proc][P2P_RECV].push_back({time_abs, time_rel, bytes});
+
+	updateInactPeriods(proc, time);
 }
 
 void TraceVisualizer::addColl(uint32_t proc, uint64_t time, uint64_t sent, uint64_t recv)
@@ -45,6 +56,8 @@ void TraceVisualizer::addColl(uint32_t proc, uint64_t time, uint64_t sent, uint6
 	auto time_rel = stats->getRelativeTime(time);
 	injections[proc][COLL_SEND].push_back({time_abs, time_rel, sent});
 	injections[proc][COLL_RECV].push_back({time_abs, time_rel, recv});
+
+	updateInactPeriods(proc, time);
 }
 
 void TraceVisualizer::addMessageCDF_P2P(uint32_t proc, uint64_t msg_len)
@@ -307,6 +320,76 @@ void TraceVisualizer::makeCdfPlot(std::string dirname)
 		int ret = std::system(gnuplot_command.c_str());
 		if (ret != 0)
 			std::cout << "Error: gnuplot returned with non-zero (" << ret << ")" << std::endl;
+		else if (config->verbose)
+			std::cout << " done. " << std::endl;
+	}
+}
+
+inline void TraceVisualizer::updateInactPeriods(uint32_t proc, uint64_t time)
+{
+	auto inactivity = time - lastActivity[proc];
+	lastActivity[proc] = time;
+	inactivity_periods[proc].push_back(inactivity);
+}
+
+void TraceVisualizer::makeInactivityHistogram(std::string dirname)
+{
+	for (auto x:inactivity_periods)
+	{
+		auto proc = x.first;
+		//std::cout << "proc=" << proc << std::endl;
+
+		std::stringstream filename;
+		filename << dirname << "/" << gnuplot_iahist_filename_prefix << std::setw(procEnumFill) << std::setfill('0') << proc << ".csv";
+		std::ofstream out(filename.str(), std::ofstream::out);
+
+		for (auto y:x.second)
+		{
+			auto inactPeriod = stats->toNanoS(y);
+			out << inactPeriod << '\n';
+		}
+		out << std::flush;
+
+		out.close();
+		filename.str(std::string()); // clear stringstream
+	}
+
+	std::string gnuplot_scriptfile = "plot_iahist.R";
+	if (config->verbose)
+		std::cout << "Writing R Script ... " << std::flush;
+	std::ofstream gnuplot(dirname + "/" + gnuplot_scriptfile);
+	gnuplot
+		<< "#!/usr/bin/Rscript" << '\n'
+		<< "library(ggplot2)" << '\n'
+		<< '\n'
+		<< "csvfiles <- list.files(pattern='iahist-p[0-9]+.csv$')" << '\n'
+		<< "for (f in csvfiles)" << '\n'
+		<< "{" << '\n'
+		<< "print(paste0('f=', f))" << '\n'
+		<< "d <- read.csv(file=f, head=F, sep=' ', comment.char = '#')" << '\n'
+		<< "d <- d/1e3 # to us" << '\n'
+		<< "d<-subset(d, V1<500) # range of the histogram" << '\n'
+		<< '\n'
+		<< "plot=qplot(V1, data=d, geom='histogram', bins=50, xlab = 'Inactivity [us]', main = 'Node Inactivity')" << '\n'
+		<< "ggsave(plot, file=paste0(f, '.pdf'))" << '\n'
+		<< "}" << '\n'
+		<< std::endl;
+
+	if (config->verbose)
+		std::cout << " done. " << std::endl;
+
+	if (rscript_present)
+	{
+		if (config->verbose)
+			std::cout << "Invoking Rscript ... " << std::flush;
+
+		std::string rscript_command = "(cd " + dirname + " && " + "Rscript " + gnuplot_scriptfile + " 1>/dev/null 2>/dev/null" + ")";
+#ifdef DEBUG
+		std::cout << "\n### rscript cmd: " << rscript_command << std::endl;
+#endif
+		int ret = std::system(rscript_command.c_str());
+		if (ret != 0)
+			std::cout << "Error: Rscript returned with non-zero (" << ret << ")" << std::endl;
 		else if (config->verbose)
 			std::cout << " done. " << std::endl;
 	}

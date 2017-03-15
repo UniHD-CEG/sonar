@@ -28,7 +28,9 @@ private:
 	const char gnuplot_seperator {','};
 	const std::string gnuplot_inj_filename_prefix {"inj-p"};
 	const std::string gnuplot_cdf_filename_prefix {"cdf-p"};
+	const std::string gnuplot_iahist_filename_prefix {"iahist-p"};
 	bool gnuplot_present {false};
+	bool rscript_present {false};
 
 	std::shared_ptr<Config>     config;
 	std::shared_ptr<TraceStats> stats;
@@ -46,6 +48,15 @@ private:
 	};
 	enum Direction {P2P_SEND, P2P_RECV, COLL_SEND, COLL_RECV};
 	std::map<uint32_t, std::map<Direction, std::vector<InjData>>> injections {};
+
+// inactivity periods
+private:
+	std::map<uint32_t, uint64_t> lastActivity {};
+	std::map<uint32_t, std::vector<uint64_t>> inactivity_periods {};
+public:
+	void updateInactPeriods(uint32_t proc, uint64_t time);
+	void makeInactivityHistogram(std::string dirname);
+
 public:
 	void addSendP2P(uint32_t proc, uint64_t time, uint64_t bytes);
 	void addRecvP2P(uint32_t proc, uint64_t time, uint64_t bytes);
